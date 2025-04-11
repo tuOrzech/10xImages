@@ -75,6 +75,4 @@ Użytkownicy stron internetowych borykają się z problemem nieoptymalizowanych 
 - 100% zgodności proponowanej nazwy pliku z ustaloną logiką bezpieczeństwa.
 - Użytkownik jest w stanie pomyślnie przejść każdy z głównych przepływów (upload, generowanie sugestii, zapis do historii, edycja, usuwanie).
 - Średni czas przetwarzania jednego obrazu nie przekracza 10-15 sekund.
-- Liczba rekordów historii na użytkownika rośnie zgodnie z oczekiwaniami.
-- Pozytywne opinie użytkowników dotyczące przejrzystości interfejsu oraz komunikatów walidacyjnych.
 - Testy jednostkowe kluczowych funkcji (walidacja plików, parsowanie odpowiedzi AI) przechodzą pomyślnie.
