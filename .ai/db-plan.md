@@ -9,6 +9,8 @@
 - **created_at**: TIMESTAMP WITH TIME ZONE, NOT NULL, DEFAULT now()
 - **updated_at**: TIMESTAMP WITH TIME ZONE, NOT NULL, DEFAULT now()
 - **original_filename**: TEXT, NOT NULL
+- **file_hash**: TEXT, NOT NULL
+- **storage_path**: TEXT, NOT NULL
 - **user_context_subject**: TEXT NULL
 - **user_context_keywords**: TEXT[] NULL
 - **generated_alt_text**: TEXT NULL
@@ -32,13 +34,21 @@
   ```sql
   CREATE INDEX idx_optimization_jobs_created_at ON optimization_jobs(created_at DESC);
   ```
+- Indeks na kolumnie **file_hash** dla szybkiego wyszukiwania duplikatów:
+  ```sql
+  CREATE INDEX idx_optimization_jobs_file_hash ON optimization_jobs(file_hash);
+  ```
 
 ## 4. Ograniczenia i mechanizmy
 
-- **Ograniczenia NOT NULL**: id, user_id, created_at, updated_at, original_filename.
+- **Ograniczenia NOT NULL**: id, user_id, created_at, updated_at, original_filename, file_hash, storage_path.
 - **Klucz główny**: id
 - **Klucz obcy**: user_id odnosi się do auth.users(id) z ON DELETE CASCADE.
 - **Domyślne wartości**: created_at i updated_at ustawione na now().
+- **Unikalność**: file_hash w ramach user_id (zapobiega duplikatom dla tego samego użytkownika):
+  ```sql
+  CREATE UNIQUE INDEX idx_unique_user_file ON optimization_jobs(user_id, file_hash);
+  ```
 
 ## 5. Automatyczna aktualizacja pola updated_at
 

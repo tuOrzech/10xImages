@@ -26,7 +26,10 @@ Endpoint odpowiedzialny za tworzenie nowej pozycji optymalizacji obrazu. Umożli
 ## 4. Szczegóły odpowiedzi
 
 - **Sukces (201):**
-  - Zwracany jest obiekt `OptimizationJobDTO` zawierający szczegóły nowo utworzonego zadania, w tym identyfikator, daty utworzenia/aktualizacji, oraz status przetwarzania.
+  - Zwracany jest obiekt `OptimizationJobDTO` zawierający szczegóły nowo utworzonego zadania, w tym:
+    - Identyfikator i daty utworzenia/aktualizacji
+    - Hash pliku (MD5) i ścieżkę w storage
+    - Status przetwarzania i wyniki AI
 - **Błędy:**
   - 400 Bad Request: Niepoprawne dane wejściowe lub nieprawidłowy format pliku.
   - 401 Unauthorized: Brak autoryzacji, nieprawidłowy token JWT lub brak sesji użytkownika.
@@ -38,12 +41,15 @@ Endpoint odpowiedzialny za tworzenie nowej pozycji optymalizacji obrazu. Umożli
 2. Serwer weryfikuje autentyczność żądania przy użyciu Supabase Auth (JWT w nagłówku).
 3. Walidacja pliku:
    - Sprawdzenie typu MIME (odpowiadający JPG, PNG lub WEBP).
-   - Sprawdzenie rozmiaru pliku i innych ograniczeń.
+   - Sprawdzenie rozmiaru pliku (max 10MB).
+   - Generowanie hasha MD5 dla zawartości pliku.
 4. Walidacja danych wejściowych (obecność `original_filename` oraz, opcjonalnie, `user_context_subject` i `user_context_keywords`).
-5. Utworzenie rekordu w tabeli `optimization_jobs` z wstępnym statusem (np. `pending` lub `processing`).
-6. Inicjacja asynchronicznego procesu, który komunikuje się z zewnętrzną usługą AI w celu generowania sugestii alt text i filename.
-7. Aktualizacja rekordu w bazie (zmiana statusu oraz zapisywanie wyników lub informacji o błędzie).
-8. Odpowiedź do klienta z utworzonym rekordem.
+5. Sprawdzenie duplikatów na podstawie kombinacji user_id i file_hash.
+6. Upload pliku do Supabase Storage z nazwą w formacie: `{user_id}/{file_hash}.{extension}`.
+7. Utworzenie rekordu w tabeli `optimization_jobs` z wstępnym statusem (np. `pending` lub `processing`).
+8. Inicjacja asynchronicznego procesu, który komunikuje się z zewnętrzną usługą AI w celu generowania sugestii alt text i filename.
+9. Aktualizacja rekordu w bazie (zmiana statusu oraz zapisywanie wyników lub informacji o błędzie).
+10. Odpowiedź do klienta z utworzonym rekordem.
 
 ## 6. Względy bezpieczeństwa
 

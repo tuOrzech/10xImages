@@ -10,6 +10,8 @@
   - `user_id`: References the authenticated user (UUID).
   - `created_at` & `updated_at`: Timestamps for record creation and updates.
   - `original_filename`: The name of the uploaded image file.
+  - `file_hash`: MD5 hash of the file content for deduplication.
+  - `storage_path`: Path to the file in the storage bucket.
   - `user_context_subject`: An optional field to describe the image subject.
   - `user_context_keywords`: An optional array of keywords provided by the user.
   - `generated_alt_text`: AI-generated alternative text for the image.
@@ -46,6 +48,8 @@
       "created_at": "timestamp",
       "updated_at": "timestamp",
       "original_filename": "string",
+      "file_hash": "string",
+      "storage_path": "string",
       "user_context_subject": "string",
       "user_context_keywords": ["string"],
       "generated_alt_text": "string",
@@ -167,9 +171,14 @@
 ## 4. Validation and Business Logic
 
 - **Validation:**
-  - For file uploads, validate that the file is either a JPG, PNG or WEBP, has an acceptable size, and matches the expected MIME type.
+  - For file uploads, validate that the file is either a JPG, PNG or WEBP, has an acceptable size (max 10MB), and matches the expected MIME type.
+  - Generate MD5 hash of file content for deduplication checks.
+  - Ensure unique combination of user_id and file_hash to prevent duplicate uploads.
   - For JSON bodies, ensure that required fields (e.g., `original_filename` in job creation) are present.
 - **Business Logic:**
+  - **File Storage:**
+    - Files are stored in a Supabase Storage bucket with path pattern: `{user_id}/{file_hash}.{extension}`.
+    - File deduplication is handled at the user level using MD5 hashes.
   - **Image Processing & AI Integration:** The POST endpoint initiates an asynchronous process that calls an external AI service to generate alt text and filename suggestions. The job's status is updated as responses are received.
   - **Error Handling:**
     - If the AI service fails or returns errors, the API records the error message in the `error_message` field and adjusts the `status` accordingly.
