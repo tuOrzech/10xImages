@@ -1,19 +1,18 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { X } from "lucide-react";
 import React, { useCallback, useState } from "react";
 
 interface ContextFormProps {
-  subject?: string;
+  subject: string;
   keywords: string[];
   onChange: (subject?: string, keywords?: string[]) => void;
 }
 
-export function ContextForm({ subject = "", keywords = [], onChange }: ContextFormProps) {
-  const [newKeyword, setNewKeyword] = useState<string>("");
+export function ContextForm({ subject, keywords, onChange }: ContextFormProps) {
+  const [newKeyword, setNewKeyword] = useState("");
 
   const handleSubjectChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -23,110 +22,88 @@ export function ContextForm({ subject = "", keywords = [], onChange }: ContextFo
   );
 
   const handleAddKeyword = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-
-      if (newKeyword.trim() === "") return;
-
-      // Check if keyword already exists
-      if (!keywords.includes(newKeyword.trim())) {
-        const updatedKeywords = [...keywords, newKeyword.trim()];
-        onChange(subject, updatedKeywords);
+    (e?: React.FormEvent) => {
+      if (e) {
+        e.preventDefault();
       }
 
-      setNewKeyword("");
+      if (newKeyword.trim()) {
+        const updatedKeywords = [...keywords, newKeyword.trim()];
+        onChange(subject, updatedKeywords);
+        setNewKeyword("");
+      }
     },
-    [keywords, newKeyword, subject, onChange]
+    [newKeyword, keywords, subject, onChange]
   );
 
-  const handleRemoveKeyword = useCallback(
-    (keywordToRemove: string) => {
-      const updatedKeywords = keywords.filter((keyword) => keyword !== keywordToRemove);
+  const removeKeyword = useCallback(
+    (indexToRemove: number) => {
+      const updatedKeywords = keywords.filter((_, index) => index !== indexToRemove);
       onChange(subject, updatedKeywords);
     },
     [keywords, subject, onChange]
   );
 
+  // Handle Enter key in keyword input
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      // Dodawanie słowa kluczowego po naciśnięciu Enter
-      if (e.key === "Enter" && !e.shiftKey && newKeyword.trim() !== "") {
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter") {
         e.preventDefault();
-
-        if (!keywords.includes(newKeyword.trim())) {
-          const updatedKeywords = [...keywords, newKeyword.trim()];
-          onChange(subject, updatedKeywords);
-        }
-
-        setNewKeyword("");
+        handleAddKeyword();
       }
     },
-    [keywords, newKeyword, subject, onChange]
+    [handleAddKeyword]
   );
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle id="context-form-title">Dodaj kontekst</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4" role="group" aria-labelledby="context-form-title">
-          <div className="space-y-2">
-            <Label htmlFor="subject">Temat obrazu (opcjonalnie)</Label>
-            <Input
-              id="subject"
-              placeholder="Np. Góry, krajobraz, produkt..."
-              value={subject}
-              onChange={handleSubjectChange}
-              aria-describedby="subject-description"
-            />
-            <p id="subject-description" className="text-sm text-gray-500 dark:text-gray-400">
-              Dodaj opis tego, co przedstawia obraz, aby pomóc AI w generowaniu lepszych sugestii.
-            </p>
-          </div>
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="subject">Temat obrazu</Label>
+        <Input
+          id="subject"
+          type="text"
+          value={subject}
+          onChange={handleSubjectChange}
+          placeholder="Opisz co przedstawia obraz..."
+        />
+      </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="keywords">Słowa kluczowe (opcjonalnie)</Label>
-            <form onSubmit={handleAddKeyword} className="flex space-x-2">
-              <Input
-                id="keywords"
-                placeholder="Wpisz słowo kluczowe"
-                value={newKeyword}
-                onChange={(e) => setNewKeyword(e.target.value)}
-                onKeyDown={handleKeyDown}
-                aria-describedby="keywords-description"
-              />
-              <Button type="submit" variant="outline">
-                Dodaj
-              </Button>
-            </form>
-            <p id="keywords-description" className="text-sm text-gray-500 dark:text-gray-400">
-              Naciśnij Enter, aby dodać słowo kluczowe.
-            </p>
-          </div>
-
-          {keywords.length > 0 && (
-            <div className="pt-2">
-              <div className="flex flex-wrap gap-2" role="list" aria-label="Wybrane słowa kluczowe">
-                {keywords.map((keyword, index) => (
-                  <Badge key={index} variant="secondary" className="flex items-center gap-1" role="listitem">
-                    {keyword}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveKeyword(keyword)}
-                      className="ml-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 p-0.5"
-                      aria-label={`Usuń słowo kluczowe ${keyword}`}
-                    >
-                      <X size={14} />
-                      <span className="sr-only">Usuń {keyword}</span>
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
+      <div className="space-y-2">
+        <Label htmlFor="keywords">Słowa kluczowe</Label>
+        <div className="flex gap-2">
+          <Input
+            id="keywords"
+            type="text"
+            value={newKeyword}
+            onChange={(e) => setNewKeyword(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Dodaj słowo kluczowe..."
+          />
+          <Button type="button" variant="secondary" disabled={!newKeyword.trim()} onClick={handleAddKeyword}>
+            Dodaj
+          </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+
+      {keywords.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {keywords.map((keyword, index) => (
+            <Badge key={`${keyword}-${index}`} variant="secondary" className="flex items-center gap-1">
+              {keyword}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-4 w-4 p-0 hover:bg-transparent"
+                onClick={() => removeKeyword(index)}
+              >
+                <X className="h-3 w-3" />
+                <span className="sr-only">Usuń słowo kluczowe {keyword}</span>
+              </Button>
+            </Badge>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

@@ -21,3 +21,21 @@
    - `ImagePreview` - do wyświetlania podglądu wybranego obrazu
    - `ContextForm` - do wprowadzania kontekstu (subject i słowa kluczowe)
    - `LoadingIndicator` - do wskazywania stanu ładowania
+
+## Kolejne kroki
+
+1. Utworzenie nowego widoku w ścieżce `/upload` z odpowiednią konfiguracją routingu.
+2. Stworzenie komponentu `UploadForm` i jego podkomponentów:
+   - `FileInput` - do wyboru i walidacji pliku obrazu
+   - `ImagePreview` - do wyświetlania podglądu wybranego obrazu
+   - `ContextForm` - formularz do wprowadzania kontekstu (subject oraz opcjonalne słowa kluczowe)
+   - `SubmitButton` - przycisk do wysyłki formularza
+   - `ToastNotification` - komunikaty błędów lub informacji
+   - `LoadingIndicator` - wskaźnik ładowania podczas przetwarzania
+3. Implementacja logiki walidacji pliku oraz generowania URL do podglądu.
+4. Implementacja obsługi stanu za pomocą hooków.
+5. Integracja z API przez wysłanie żądania do endpointu `POST /api/optimization-jobs`.
+6. Implementacja obsługi błędów i wyświetlanie komunikatów.
+7. Testowanie widoku pod kątem walidacji, poprawności wyświetlania podglądu oraz integracji z API.
+8. Zastosowanie Tailwind CSS oraz komponentów Shadcn/ui dla spójności interfejsu i responsywności.
+9. Przeprowadzenie testów manualnych oraz wprowadzenie poprawek na podstawie feedbacku.

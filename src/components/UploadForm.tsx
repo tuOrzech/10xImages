@@ -31,10 +31,10 @@ export default function UploadForm() {
   });
 
   const handleContextChange = useCallback((subject?: string, keywords?: string[]) => {
-    setContext({
-      subject: subject || "",
-      keywords: keywords || [],
-    });
+    setContext((prev) => ({
+      subject: subject ?? prev.subject,
+      keywords: keywords ?? prev.keywords,
+    }));
   }, []);
 
   const handleSubmit = useCallback(
@@ -94,7 +94,7 @@ export default function UploadForm() {
         setShowProgress(false);
       }
     },
-    [file, isValid, context, resetFile]
+    [file, isValid, context]
   );
 
   // Obsługa klawiszy skrótów
@@ -142,7 +142,7 @@ export default function UploadForm() {
         </div>
       </div>
 
-      {previewUrl && <ImagePreview previewUrl={previewUrl} />}
+      {previewUrl && file && <ImagePreview previewUrl={previewUrl} fileName={file.name} />}
 
       <ContextForm subject={context.subject} keywords={context.keywords} onChange={handleContextChange} />
 
