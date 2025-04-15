@@ -1,0 +1,13 @@
+---
+import UploadForm from "../components/UploadForm";
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title='Panel przesyłania plików - AltImageOptimizer'>
+  <main class='container mx-auto py-8 px-4'>
+    <h1 class='text-3xl font-bold mb-6'>Panel przesyłania plików</h1>
+    <div class='max-w-2xl mx-auto'>
+      <UploadForm client:load />
+    </div>
+  </main>
+</Layout>

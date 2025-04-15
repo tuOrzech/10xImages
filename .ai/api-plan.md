@@ -35,7 +35,7 @@
 - **Request:**
   - **Content-Type:** multipart/form-data
   - **Body Fields:**
-    - `image`: The image file (JPG or PNG).
+    - `image`: The image file (JPG, PNG or WEBP).
     - `original_filename`: String; required if not inferred from the file.
     - `user_context_subject`: String (optional).
     - `user_context_keywords`: Array of strings (optional).

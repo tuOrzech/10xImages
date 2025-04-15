@@ -42,4 +42,19 @@ export class ImageService {
       return { error: error instanceof Error ? error : new Error("Unknown error during upload") };
     }
   }
+
+  async deleteImage(storagePath: string): Promise<{ error?: Error }> {
+    try {
+      const { error } = await this.storage.from("optimization-images").remove([storagePath]);
+
+      if (error) {
+        throw error;
+      }
+
+      return {};
+    } catch (error) {
+      console.error("Error deleting image:", error);
+      return { error: error instanceof Error ? error : new Error("Unknown error during deletion") };
+    }
+  }
 }
