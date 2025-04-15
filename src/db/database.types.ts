@@ -26,6 +26,7 @@ export interface Database {
           ai_request_id: string | null;
           created_at: string;
           error_message: string | null;
+          file_hash: string | null;
           generated_alt_text: string | null;
           generated_filename_suggestion: string | null;
           id: string;
@@ -41,6 +42,7 @@ export interface Database {
           ai_request_id?: string | null;
           created_at?: string;
           error_message?: string | null;
+          file_hash?: string | null;
           generated_alt_text?: string | null;
           generated_filename_suggestion?: string | null;
           id?: string;
@@ -56,6 +58,7 @@ export interface Database {
           ai_request_id?: string | null;
           created_at?: string;
           error_message?: string | null;
+          file_hash?: string | null;
           generated_alt_text?: string | null;
           generated_filename_suggestion?: string | null;
           id?: string;
