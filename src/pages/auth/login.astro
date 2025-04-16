@@ -1,0 +1,13 @@
+---
+import LoginForm from "../../components/auth/LoginForm";
+import Layout from "../../layouts/Layout.astro";
+---
+
+<Layout title='Login - AltImageOptimizer'>
+  <main class='container mx-auto py-8 px-4'>
+    <div class='max-w-md mx-auto'>
+      <h1 class='text-3xl font-bold mb-6 text-center'>Login</h1>
+      <LoginForm client:load />
+    </div>
+  </main>
+</Layout>

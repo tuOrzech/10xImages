@@ -1,0 +1,13 @@
+---
+import RegisterForm from "../../components/auth/RegisterForm";
+import Layout from "../../layouts/Layout.astro";
+---
+
+<Layout title='Register - AltImageOptimizer'>
+  <main class='container mx-auto py-8 px-4'>
+    <div class='max-w-md mx-auto'>
+      <h1 class='text-3xl font-bold mb-6 text-center'>Create Account</h1>
+      <RegisterForm client:load />
+    </div>
+  </main>
+</Layout>
