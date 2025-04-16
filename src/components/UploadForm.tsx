@@ -81,7 +81,7 @@ export default function UploadForm() {
         toast.success("Obraz został przesłany pomyślnie!");
 
         // Redirect to the preview page
-        window.location.href = `/preview?id=${result.id}`;
+        window.location.href = `/preview/${result.id}`;
       } catch (error) {
         // Handle errors
         const errorMessage =

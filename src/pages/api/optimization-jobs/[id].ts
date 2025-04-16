@@ -1,7 +1,29 @@
+import type { OptimizationJobDTO } from "@/types";
 import type { APIRoute } from "astro";
 import { z } from "zod";
-import { DEFAULT_USER_ID, supabaseClient } from "../../../db/supabase.client";
-import { OptimizationService } from "../../../lib/services/optimization.service";
+
+// Mock data for development
+const mockJobs = new Map<string, OptimizationJobDTO>([
+  [
+    "mock-job-1",
+    {
+      id: "mock-job-1",
+      user_id: "mock-user-id",
+      created_at: "2023-01-01T12:00:00Z",
+      updated_at: "2023-01-01T12:00:00Z",
+      original_filename: "mountain.jpg",
+      file_hash: "mock-file-hash-1",
+      status: "completed",
+      user_context_subject: "Landscape",
+      user_context_keywords: ["mountains", "sunset", "nature"],
+      generated_alt_text: "A serene mountain landscape at sunset with snow-capped peaks reflecting golden light",
+      generated_filename_suggestion: "mountain-sunset-landscape",
+      ai_detected_keywords: ["mountains", "sunset", "snow", "peaks", "landscape"],
+      ai_request_id: null,
+      error_message: null,
+    },
+  ],
+]);
 
 // Schema for validating update request
 const updateOptimizationJobSchema = z.object({
@@ -15,214 +37,118 @@ const updateOptimizationJobSchema = z.object({
 
 export const prerender = false;
 
+// Helper function to create a mock job
+function createMockJob(id: string): OptimizationJobDTO {
+  return {
+    id,
+    user_id: "mock-user-id",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    original_filename: "sample-image.jpg",
+    file_hash: `mock-file-hash-${id.substring(0, 8)}`,
+    status: "completed",
+    user_context_subject: "Sample Subject",
+    user_context_keywords: ["sample", "keywords"],
+    generated_alt_text: "A sample image showing the product in use",
+    generated_filename_suggestion: "sample-product-usage",
+    ai_detected_keywords: ["sample", "product", "usage"],
+    ai_request_id: null,
+    error_message: null,
+  };
+}
+
 // Get single optimization job
 export const GET: APIRoute = async ({ params }) => {
   try {
-    const jobId = params.id;
-    if (!jobId) {
-      return new Response(
-        JSON.stringify({
-          error: "Job ID is required",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+    const { id } = params;
+
+    if (!id) {
+      return new Response(JSON.stringify({ message: "Missing job ID" }), { status: 400 });
     }
 
-    const optimizationService = new OptimizationService(supabaseClient, supabaseClient.storage);
-    const { data, error } = await optimizationService.getOptimizationJob(DEFAULT_USER_ID, jobId);
-
-    if (error) {
-      if (error.message === "Optimization job not found") {
-        return new Response(
-          JSON.stringify({
-            error: error.message,
-          }),
-          {
-            status: 404,
-            headers: { "Content-Type": "application/json" },
-          }
-        );
-      }
-
-      console.error("Error getting optimization job:", error);
-      return new Response(
-        JSON.stringify({
-          error: error.message,
-        }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+    // For any non-mocked ID, create a dynamic mock job
+    if (!mockJobs.has(id)) {
+      mockJobs.set(id, createMockJob(id));
     }
 
-    return new Response(JSON.stringify(data), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    const job = mockJobs.get(id);
+
+    return new Response(JSON.stringify(job));
   } catch (error) {
-    console.error("Error processing get request:", error);
-    return new Response(
-      JSON.stringify({
-        error: "Internal server error",
-      }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      }
-    );
+    console.error("Error fetching optimization job:", error);
+    return new Response(JSON.stringify({ message: "Internal server error" }), { status: 500 });
   }
 };
 
 // Update optimization job
 export const PATCH: APIRoute = async ({ request, params }) => {
   try {
-    const jobId = params.id;
-    if (!jobId) {
-      return new Response(
-        JSON.stringify({
-          error: "Job ID is required",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+    const { id } = params;
+    if (!id) {
+      return new Response(JSON.stringify({ message: "Job ID is required" }), { status: 400 });
     }
 
     const contentType = request.headers.get("content-type");
     if (!contentType?.includes("application/json")) {
-      return new Response(
-        JSON.stringify({
-          error: "Content-Type must be application/json",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+      return new Response(JSON.stringify({ message: "Content-Type must be application/json" }), { status: 400 });
+    }
+
+    // Check if job exists
+    if (!mockJobs.has(id)) {
+      return new Response(JSON.stringify({ message: "Optimization job not found" }), { status: 404 });
     }
 
     const rawData = await request.json();
     const validatedData = updateOptimizationJobSchema.parse(rawData);
 
-    const optimizationService = new OptimizationService(supabaseClient, supabaseClient.storage);
-    const { data, error } = await optimizationService.updateOptimizationJob(DEFAULT_USER_ID, jobId, validatedData);
-
-    if (error) {
-      if (error.message === "Optimization job not found") {
-        return new Response(
-          JSON.stringify({
-            error: error.message,
-          }),
-          {
-            status: 404,
-            headers: { "Content-Type": "application/json" },
-          }
-        );
-      }
-
-      console.error("Error updating optimization job:", error);
-      return new Response(
-        JSON.stringify({
-          error: error.message,
-        }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+    // Update the mock job
+    const job = mockJobs.get(id);
+    if (!job) {
+      return new Response(JSON.stringify({ message: "Optimization job not found" }), { status: 404 });
     }
 
-    return new Response(JSON.stringify(data), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    const updatedJob: OptimizationJobDTO = {
+      ...job,
+      ...validatedData,
+      updated_at: new Date().toISOString(),
+    };
+    mockJobs.set(id, updatedJob);
+
+    return new Response(JSON.stringify(updatedJob));
   } catch (error) {
     if (error instanceof z.ZodError) {
       return new Response(
         JSON.stringify({
-          error: "Validation error",
+          message: "Validation error",
           details: error.errors,
         }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        }
+        { status: 400 }
       );
     }
 
     console.error("Error processing update request:", error);
-    return new Response(
-      JSON.stringify({
-        error: "Internal server error",
-      }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      }
-    );
+    return new Response(JSON.stringify({ message: "Internal server error" }), { status: 500 });
   }
 };
 
 // Delete optimization job
 export const DELETE: APIRoute = async ({ params }) => {
   try {
-    const jobId = params.id;
-    if (!jobId) {
-      return new Response(
-        JSON.stringify({
-          error: "Job ID is required",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+    const { id } = params;
+    if (!id) {
+      return new Response(JSON.stringify({ message: "Job ID is required" }), { status: 400 });
     }
 
-    const optimizationService = new OptimizationService(supabaseClient, supabaseClient.storage);
-    const { error } = await optimizationService.deleteOptimizationJob(DEFAULT_USER_ID, jobId);
-
-    if (error) {
-      if (error.message === "Optimization job not found") {
-        return new Response(
-          JSON.stringify({
-            error: error.message,
-          }),
-          {
-            status: 404,
-            headers: { "Content-Type": "application/json" },
-          }
-        );
-      }
-
-      console.error("Error deleting optimization job:", error);
-      return new Response(
-        JSON.stringify({
-          error: error.message,
-        }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+    if (!mockJobs.has(id)) {
+      return new Response(JSON.stringify({ message: "Optimization job not found" }), { status: 404 });
     }
+
+    // Remove the job from mock data
+    mockJobs.delete(id);
 
     return new Response(null, { status: 204 });
   } catch (error) {
     console.error("Error processing delete request:", error);
-    return new Response(
-      JSON.stringify({
-        error: "Internal server error",
-      }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      }
-    );
+    return new Response(JSON.stringify({ message: "Internal server error" }), { status: 500 });
   }
 };

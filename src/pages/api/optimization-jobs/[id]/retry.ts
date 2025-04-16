@@ -1,79 +1,37 @@
+import type { OptimizationJobDTO } from "@/types";
 import type { APIRoute } from "astro";
-import { DEFAULT_USER_ID, supabaseClient } from "../../../../db/supabase.client";
-import { OptimizationService } from "../../../../lib/services/optimization.service";
 
 export const prerender = false;
 
-// Retry optimization job
 export const POST: APIRoute = async ({ params }) => {
   try {
-    const jobId = params.id;
-    if (!jobId) {
-      return new Response(
-        JSON.stringify({
-          error: "Job ID is required",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+    const { id } = params;
+
+    if (!id) {
+      return new Response(JSON.stringify({ message: "Job ID is required" }), { status: 400 });
     }
 
-    const optimizationService = new OptimizationService(supabaseClient, supabaseClient.storage);
-    const { data, error } = await optimizationService.retryOptimizationJob(DEFAULT_USER_ID, jobId);
+    // Return a mock response for the retried job
+    const retriedJob: OptimizationJobDTO = {
+      id,
+      user_id: "mock-user-id",
+      created_at: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+      updated_at: new Date().toISOString(),
+      original_filename: "retried-image.jpg",
+      file_hash: `mock-file-hash-${id.substring(0, 8)}`,
+      status: "processing", // Changed to processing since it was just retried
+      user_context_subject: "Retried Subject",
+      user_context_keywords: ["retried", "keywords"],
+      generated_alt_text: null, // Reset on retry
+      generated_filename_suggestion: null, // Reset on retry
+      ai_detected_keywords: null,
+      ai_request_id: null,
+      error_message: null, // Error cleared on retry
+    };
 
-    if (error) {
-      if (error.message === "Optimization job not found") {
-        return new Response(
-          JSON.stringify({
-            error: error.message,
-          }),
-          {
-            status: 404,
-            headers: { "Content-Type": "application/json" },
-          }
-        );
-      }
-
-      if (error.message === "Only failed jobs can be retried") {
-        return new Response(
-          JSON.stringify({
-            error: error.message,
-          }),
-          {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          }
-        );
-      }
-
-      console.error("Error retrying optimization job:", error);
-      return new Response(
-        JSON.stringify({
-          error: error.message,
-        }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    return new Response(JSON.stringify(data), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify(retriedJob));
   } catch (error) {
     console.error("Error processing retry request:", error);
-    return new Response(
-      JSON.stringify({
-        error: "Internal server error",
-      }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      }
-    );
+    return new Response(JSON.stringify({ message: "Internal server error" }), { status: 500 });
   }
 };

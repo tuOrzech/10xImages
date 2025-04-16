@@ -1,4 +1,5 @@
 ---
+import {Toaster} from "@/components/ui/sonner";
 import {ThemeProvider} from "../components/ui/theme-provider";
 import "../styles/global.css";
 
@@ -22,6 +23,7 @@ const {title = "AltImageOptimizer"} = Astro.props;
     <ThemeProvider client:load>
       <slot />
     </ThemeProvider>
+    <Toaster client:load richColors />
   </body>
 </html>
 

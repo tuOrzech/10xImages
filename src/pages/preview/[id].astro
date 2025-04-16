@@ -1,0 +1,18 @@
+---
+import PreviewComponent from "@/components/PreviewComponent";
+import Layout from "@/layouts/Layout.astro";
+
+// Get the job ID from URL params
+const {id} = Astro.params;
+
+// Ensure id is provided
+if (!id) {
+  return Astro.redirect("/");
+}
+---
+
+<Layout title='Preview & Edit Image Optimization'>
+  <main class='container mx-auto py-8 px-4'>
+    <PreviewComponent jobId={id} client:load />
+  </main>
+</Layout>
