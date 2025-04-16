@@ -36,6 +36,7 @@ export interface Database {
           user_context_keywords: string[] | null;
           user_context_subject: string | null;
           user_id: string;
+          storage_path: string;
         };
         Insert: {
           ai_detected_keywords?: string[] | null;
@@ -52,6 +53,7 @@ export interface Database {
           user_context_keywords?: string[] | null;
           user_context_subject?: string | null;
           user_id: string;
+          storage_path: string;
         };
         Update: {
           ai_detected_keywords?: string[] | null;
@@ -68,6 +70,7 @@ export interface Database {
           user_context_keywords?: string[] | null;
           user_context_subject?: string | null;
           user_id?: string;
+          storage_path?: string;
         };
         Relationships: [];
       };

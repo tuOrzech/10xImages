@@ -7,12 +7,46 @@ export const modelParamsSchema = z.object({
   topP: z.number().min(0).max(1),
 });
 
+// Message content validation for multimodal messages
+export const messageContentSchema = z.union([
+  z.string(),
+  z.array(
+    z.object({
+      type: z.enum(["text", "image_url"]),
+      text: z.string().optional(),
+      image_url: z
+        .object({
+          url: z.string().url("Invalid image URL"),
+          detail: z.enum(["low", "high"]).optional(),
+        })
+        .optional(),
+    })
+  ),
+]);
+
+// Message validation for both text and multimodal
+export const messageSchema = z.union([
+  z.string().min(1, "Message cannot be empty").max(32000, "Message is too long"),
+  z.object({
+    role: z.enum(["system", "user"]),
+    content: messageContentSchema,
+  }),
+]);
+
+// System prompt validation
+export const systemPromptSchema = z.object({
+  role: z.literal("system"),
+  content: z.string().min(1),
+  context: z.string().optional(),
+});
+
 // Configuration validation
 export const configSchema = z.object({
   apiKey: z.string().min(1, "API key is required"),
   apiEndpoint: z.string().url("Invalid API endpoint URL"),
   defaultModel: z.string().min(1, "Default model is required"),
   modelParams: modelParamsSchema,
+  systemPrompt: systemPromptSchema,
 });
 
 // Rate limit configuration validation
@@ -20,9 +54,6 @@ export const rateLimitConfigSchema = z.object({
   maxRequestsPerMinute: z.number().int().positive(),
   maxRequestsPerHour: z.number().int().positive(),
 });
-
-// Message validation
-export const messageSchema = z.string().min(1, "Message cannot be empty").max(32000, "Message is too long");
 
 // Response schema validation
 export const responseSchema = z.object({
@@ -47,3 +78,5 @@ export type ConfigType = z.infer<typeof configSchema>;
 export type RateLimitConfig = z.infer<typeof rateLimitConfigSchema>;
 export type Response = z.infer<typeof responseSchema>;
 export type ModelParams = z.infer<typeof modelParamsSchema>;
+export type SystemPrompt = z.infer<typeof systemPromptSchema>;
+export type MessageContent = z.infer<typeof messageContentSchema>;

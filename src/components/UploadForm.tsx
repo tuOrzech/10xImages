@@ -58,16 +58,9 @@ export default function UploadForm() {
         const jobData: CreateOptimizationJobCommandDTO = {
           image: file,
           original_filename: file.name,
+          user_context_subject: context.subject || undefined,
+          user_context_keywords: context.keywords.length > 0 ? context.keywords : undefined,
         };
-
-        // Add optional context data if provided
-        if (context.subject) {
-          jobData.user_context_subject = context.subject;
-        }
-
-        if (context.keywords.length > 0) {
-          jobData.user_context_keywords = context.keywords;
-        }
 
         // Track upload progress
         const handleProgress = (progress: number) => {

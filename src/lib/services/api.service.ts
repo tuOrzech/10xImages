@@ -13,57 +13,44 @@ export async function createOptimizationJob(
   onProgress?: (progress: number) => void
 ): Promise<OptimizationJobDTO> {
   try {
-    // Simulate file upload progress
-    if (onProgress) {
-      let progress = 0;
-      const interval = setInterval(() => {
-        progress += 10;
-        onProgress(Math.min(progress, 100));
-        if (progress >= 100) {
-          clearInterval(interval);
-        }
-      }, 200);
+    // Create FormData
+    const formData = new FormData();
+    formData.append("image", data.image);
+    formData.append("original_filename", data.original_filename);
+
+    if (data.user_context_subject) {
+      formData.append("user_context_subject", data.user_context_subject);
     }
 
-    // Mock response data
-    const mockResponses = [
-      {
-        alt: "A serene mountain landscape at sunset with snow-capped peaks reflecting golden light",
-        filename: "mountain-sunset-landscape",
-      },
-      {
-        alt: "Modern minimalist workspace with white desk, laptop and coffee cup",
-        filename: "minimal-workspace-setup",
-      },
-      {
-        alt: "Fresh organic vegetables arranged on rustic wooden table",
-        filename: "fresh-organic-vegetables",
-      },
-    ];
+    if (data.user_context_keywords?.length) {
+      data.user_context_keywords.forEach((keyword) => {
+        formData.append("user_context_keywords", keyword);
+      });
+    }
 
-    // Get random mock response
-    const mockResponse = mockResponses[Math.floor(Math.random() * mockResponses.length)];
+    // Handle upload progress
+    if (onProgress) {
+      onProgress(0);
+    }
 
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    // Send request to API
+    const response = await fetch("/api/optimization-jobs", {
+      method: "POST",
+      body: formData,
+    });
 
-    // Return mock optimization job
-    return {
-      id: crypto.randomUUID(),
-      user_id: "mock-user-id",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      original_filename: data.original_filename,
-      file_hash: "mock-file-hash",
-      status: "completed",
-      user_context_subject: data.user_context_subject || null,
-      user_context_keywords: data.user_context_keywords || null,
-      generated_alt_text: mockResponse.alt,
-      generated_filename_suggestion: mockResponse.filename,
-      ai_detected_keywords: null,
-      ai_request_id: null,
-      error_message: null,
-    };
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to create optimization job");
+    }
+
+    const result = await response.json();
+
+    if (onProgress) {
+      onProgress(100);
+    }
+
+    return result.data;
   } catch (error) {
     console.error("Error creating optimization job:", error);
     throw error;

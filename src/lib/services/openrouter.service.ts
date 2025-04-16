@@ -1,4 +1,4 @@
-import type { ConfigType, RateLimitConfig as RateLimitConfigType, Response } from "./openrouter.types";
+import type { ConfigType, RateLimitConfig as RateLimitConfigType, Response, SystemPrompt } from "./openrouter.types";
 import { configSchema, messageSchema, rateLimitConfigSchema, responseSchema } from "./openrouter.types";
 
 // OpenRouter specific error types
@@ -14,9 +14,10 @@ class OpenRouterError extends Error {
   }
 }
 
-class OpenRouterRateLimitError extends OpenRouterError {
+export class OpenRouterRateLimitError extends OpenRouterError {
   constructor(message: string, waitTime: number) {
-    super(message, "RATE_LIMIT_EXCEEDED", 429, { waitTime });
+    const userMessage = "Przekroczono dzienny limit zapytań. Spróbuj ponownie jutro lub dodaj kredyty do konta.";
+    super(userMessage, "RATE_LIMIT_EXCEEDED", 429, { waitTime });
     this.name = "OpenRouterRateLimitError";
   }
 }
@@ -35,9 +36,23 @@ class OpenRouterValidationError extends OpenRouterError {
   }
 }
 
+interface MessageContent {
+  type: "text" | "image_url";
+  text?: string;
+  image_url?: {
+    url: string;
+    detail?: "low" | "high";
+  };
+}
+
+interface Message {
+  role: "system" | "user";
+  content: string | MessageContent[];
+}
+
 interface MessagePayload {
   model: string;
-  messages: { role: "system" | "user"; content: string }[];
+  messages: Message[];
   response_format: object;
   temperature: number;
   max_tokens: number;
@@ -92,15 +107,14 @@ class DefaultLogger implements Logger {
 
 export class OpenRouterService {
   // Public fields
-  public config: ConfigType;
+  public config!: ConfigType;
   public lastResponse: Response | null = null;
 
   // Private fields
-  private readonly _apiEndpoint: string;
-  private readonly _apiKey: string;
-  private readonly _logger: Logger;
-  private readonly _defaultSystemMessage: string;
-  private readonly _responseFormat: object;
+  private readonly _apiEndpoint!: string;
+  private readonly _apiKey!: string;
+  private readonly _logger!: Logger;
+  private readonly _responseFormat!: object;
   private readonly _maxRetries = 3;
   private readonly _baseDelay = 1000; // 1 second
   private readonly _rateLimitConfig: RateLimitConfigType = {
@@ -117,21 +131,81 @@ export class OpenRouterService {
     },
   };
 
-  constructor(
-    systemMessage = "You are a virtual assistant powered by OpenRouter.",
-    config?: Partial<ConfigType>,
-    rateLimitConfig?: Partial<RateLimitConfigType>,
-    logger?: Logger
-  ) {
+  constructor(config?: Partial<ConfigType>, rateLimitConfig?: Partial<RateLimitConfigType>, logger?: Logger) {
     // Initialize configuration with defaults and environment variables
     const defaultConfig = {
-      apiKey: process.env.OPENROUTER_API_KEY || "",
-      apiEndpoint: process.env.OPENROUTER_API_ENDPOINT || "https://openrouter.ai/api/v1",
-      defaultModel: process.env.OPENROUTER_DEFAULT_MODEL || "openrouter-llm",
+      apiKey: import.meta.env.OPENROUTER_API_KEY || "",
+      apiEndpoint: import.meta.env.OPENROUTER_API_ENDPOINT || "https://openrouter.ai/api/v1",
+      defaultModel: import.meta.env.OPENROUTER_DEFAULT_MODEL || "qwen/qwen2.5-vl-72b-instruct:free",
       modelParams: {
         temperature: 0.7,
         maxTokens: 4096,
         topP: 1.0,
+      },
+      systemPrompt: {
+        role: "system" as const,
+        content: `Jesteś ekspertem w tworzeniu opisów obrazów zgodnych z WCAG 2.1, nowoczesnym SEO oraz zasadami UX/UI.
+Twoim zadaniem jest wygenerowanie DWÓCH rzeczy dla załączonego obrazu, W JĘZYKU POLSKIM:
+
+1. **Tekst Alternatywny (alt):**
+   - Stosuj podejście storytellingowe - zacznij od najważniejszego elementu obrazu
+   - Maksymalnie 125 znaków, zakończone kropką
+   - Opisz:
+     * Główny podmiot i jego najważniejszą akcję/stan
+     * Kluczowy kontekst emocjonalny lub artystyczny (nastrój, atmosfera)
+     * Istotne elementy otoczenia wpływające na przekaz
+   - Zasady:
+     * Używaj dynamicznych czasowników opisujących akcję
+     * Dodaj kropkę na końcu (pomaga czytelnikom ekranowym)
+     * Pisz naturalnym językiem, który dobrze brzmi gdy jest czytany na głos
+     * Zachowuj poprawną gramatykę (szczególnie miejscownik)
+   - Unikaj:
+     * Rozpoczynania od "zdjęcie przedstawia", "obraz pokazuje" itp.
+     * Powtarzania tekstu z otoczenia obrazu
+     * Zbędnych szczegółów niezwiązanych z głównym przekazem
+     * Łamania tekstu na wiele linii
+     * Nadmiernego upychania słów kluczowych SEO
+
+2. **Nazwa Pliku:**
+   - Format: [artysta]-[kluczowy-element]-[kontekst]-[miejsce]-[rok].webp
+   - Zasady:
+     * 3-5 krótkich słów kluczowych (nie licząc artysty/miejsca/roku)
+     * Tylko małe litery, bez polskich znaków
+     * Tylko polskie słowa (z wyjątkiem nazw własnych)
+     * Używaj myślników między słowami
+     * Preferuj rzeczowniki i przymiotniki w podstawowej formie
+   - Maksymalna długość: 80 znaków
+   - Każda nazwa MUSI być unikalna
+
+ZABRONIONE słowa w nazwach plików:
+- spieva → spiew
+- siluet → sylwetka
+- dance → taniec
+- light → swiatlo
+- scene → scena
+- performance → wystep
+
+PRZYKŁADY:
+
+Przykład koncertu:
+Alt: Artystka w czarnej sukni wykonuje dramatyczny gest, otoczona czerwonymi światłami i kłębami dymu na scenie.
+Nazwa: madonna-czarna-suknia-dym-czerwone-swiatla-warszawa-2024.webp
+
+Przykład detalu:
+Alt: Dłonie artysty pewnie uderzają w klawisze fortepianu, oświetlone ciepłym światłem reflektorów.
+Nazwa: zimerman-dlonie-fortepian-reflektory-krakow-2024.webp
+
+Format odpowiedzi:
+Alt: [Jedno zdanie tekstu alternatywnego zakończone kropką]
+Nazwa: [unikalna-nazwa-pliku-webp]
+
+PAMIĘTAJ:
+- Priorytetyzuj najważniejszą informację na początku opisu
+- Uwzględniaj kontekst emocjonalny i artystyczny
+- Używaj naturalnego języka, który dobrze brzmi gdy jest czytany na głos
+- Zachowuj spójność między opisem a kontekstem użycia obrazu
+- Twórz unikalne opisy, nawet dla podobnych zdjęć
+- Kończ opisy kropką dla lepszej czytelności przez czytniki ekranowe`,
       },
     };
 
@@ -145,7 +219,6 @@ export class OpenRouterService {
     this._apiEndpoint = this.config.apiEndpoint;
     this._apiKey = this.config.apiKey;
     this._logger = logger || new DefaultLogger(process.env.NODE_ENV === "development");
-    this._defaultSystemMessage = systemMessage;
     this._responseFormat = {
       type: "json_schema",
       json_schema: {
@@ -172,6 +245,44 @@ export class OpenRouterService {
       model: this.config.defaultModel,
       rateLimits: this._rateLimitConfig,
     });
+  }
+
+  public setSystemPrompt(systemPrompt: SystemPrompt): void {
+    this.config = configSchema.parse({
+      ...this.config,
+      systemPrompt,
+    });
+    this._logger.info("System prompt updated");
+  }
+
+  private _preparePayload(message: Message): MessagePayload {
+    const messages: Message[] = [
+      {
+        role: "system",
+        content: this.config.systemPrompt.content,
+      },
+      message,
+    ];
+
+    const payload: MessagePayload = {
+      model: this.config.defaultModel,
+      messages,
+      response_format: {
+        type: "text",
+      },
+      temperature: this.config.modelParams.temperature,
+      max_tokens: this.config.modelParams.maxTokens,
+      top_p: this.config.modelParams.topP,
+    };
+
+    this._logger.debug("Prepared request payload", {
+      model: payload.model,
+      temperature: payload.temperature,
+      max_tokens: payload.max_tokens,
+      messages: payload.messages,
+    });
+
+    return payload;
   }
 
   // Public method to update configuration
@@ -325,20 +436,56 @@ export class OpenRouterService {
   /**
    * Send a request to OpenRouter API
    */
-  public async sendRequest(message: string): Promise<Response> {
+  public async sendRequest(message: string, imageUrl?: string): Promise<Response> {
     try {
-      this._logger.debug("Validating input message");
-      const validatedMessage = messageSchema.parse(message);
+      this._logger.info("Starting new request to OpenRouter", {
+        hasImage: !!imageUrl,
+        messageLength: message.length,
+      });
 
-      this._logger.debug("Checking rate limits");
+      this._logger.debug("Validating input message and preparing payload");
+
+      // Validate the input message
+      messageSchema.parse(message);
+
+      // Prepare message content based on whether we have an image
+      const messageContent = imageUrl
+        ? [
+            {
+              type: "image_url" as const,
+              image_url: {
+                url: imageUrl,
+                detail: "high" as const,
+              },
+            },
+            {
+              type: "text" as const,
+              text: message,
+            },
+          ]
+        : message;
+
+      // Create the user message
+      const userMessage: Message = {
+        role: "user",
+        content: messageContent,
+      };
+
+      this._logger.info("Checking rate limits...");
       this._checkRateLimit();
+      const rateLimitStatus = this.getRateLimitStatus();
+      this._logger.info("Rate limit status", {
+        minuteRequestsRemaining: rateLimitStatus.minuteRequestsRemaining,
+        hourRequestsRemaining: rateLimitStatus.hourRequestsRemaining,
+      });
 
       this._logger.debug("Preparing request payload");
-      const payload = this._preparePayload(validatedMessage);
+      const payload = this._preparePayload(userMessage);
 
       this._logger.info("Sending request to OpenRouter API", {
         model: payload.model,
-        messageLength: validatedMessage.length,
+        hasImage: !!imageUrl,
+        imageUrl: imageUrl ? `${imageUrl.substring(0, 50)}...` : undefined,
       });
 
       const response = await this._sendRequestWithRetry(payload);
@@ -350,10 +497,22 @@ export class OpenRouterService {
       this._logger.info("Request completed successfully", {
         model: response.data.model,
         usage: response.data.usage,
+        contentLength: response.data.content?.length ?? 0,
       });
 
       return validatedResponse;
     } catch (error) {
+      this._logger.error("Failed to process request", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        name: error instanceof Error ? error.name : undefined,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
+      // Dodaj dodatkowy log dla błędu rate limit
+      if (error instanceof OpenRouterRateLimitError) {
+        console.error("[OpenRouter] Rate Limit Error:", error.message);
+      }
+
       const errorResponse: Response = {
         success: false,
         data: error instanceof Error ? { error: error.message } : { error: "Unknown error occurred" },
@@ -361,38 +520,8 @@ export class OpenRouterService {
       };
       this.lastResponse = errorResponse;
 
-      // Error is already logged in _handleApiError
-      if (!(error instanceof OpenRouterError)) {
-        this._logger.error("Error sending request:", error);
-      }
-
       throw error;
     }
-  }
-
-  /**
-   * Prepare payload for API request
-   */
-  private _preparePayload(message: string): MessagePayload {
-    const payload: MessagePayload = {
-      model: this.config.defaultModel,
-      messages: [
-        { role: "system" as const, content: this._defaultSystemMessage },
-        { role: "user" as const, content: message },
-      ],
-      response_format: this._responseFormat,
-      temperature: this.config.modelParams.temperature,
-      max_tokens: this.config.modelParams.maxTokens,
-      top_p: this.config.modelParams.topP,
-    };
-
-    this._logger.debug("Prepared request payload", {
-      model: payload.model,
-      temperature: payload.temperature,
-      max_tokens: payload.max_tokens,
-    });
-
-    return payload;
   }
 
   /**
@@ -409,17 +538,74 @@ export class OpenRouterService {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "HTTP-Referer": "https://github.com/tuorzech/altimgoptimizer",
+          "X-Title": "AltImgOptimizer",
           Authorization: `Bearer ${this._apiKey}`,
         },
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        this._handleApiError(null, { status: response.status, data: errorData });
+      const data = await response.json();
+
+      this._logger.debug("Received API response", {
+        status: response.status,
+        data: data,
+        headers: Object.fromEntries(response.headers.entries()),
+      });
+
+      // Sprawdź najpierw czy w odpowiedzi nie ma błędu rate limit
+      if (data.error?.code === 429 || response.status === 429) {
+        const errorMessage = data.error?.message || "Dzienny limit zapytań został wykorzystany.";
+        this._logger.error("Rate limit exceeded", {
+          details: data.error,
+          message: errorMessage,
+          status: response.status,
+          errorCode: data.error?.code,
+        });
+
+        // Wyciągnij informację o kredytach jeśli jest w wiadomości
+        const creditsInfo = errorMessage.match(/Add (\d+) credits to unlock/);
+        const creditsNeeded = creditsInfo ? creditsInfo[1] : "10";
+
+        const userMessage = `Przekroczono dzienny limit zapytań. Dodaj ${creditsNeeded} kredytów aby odblokować limit.`;
+        console.error("[OpenRouter] Rate Limit Error:", userMessage);
+        console.error("[OpenRouter] Original response:", {
+          status: response.status,
+          errorCode: data.error?.code,
+          errorMessage: data.error?.message,
+        });
+
+        const error = new OpenRouterRateLimitError(userMessage, 86400); // 24h
+        console.error("[OpenRouter] Created error object:", {
+          name: error.name,
+          message: error.message,
+          code: error.code,
+          status: error.status,
+        });
+
+        throw error;
       }
 
-      const data = await response.json();
+      // Sprawdź inne błędy API
+      if (data.error || !response.ok) {
+        this._logger.error("API error occurred", {
+          status: response.status,
+          error: data.error,
+        });
+        throw new OpenRouterError(
+          data.error?.message || "Unknown API error",
+          data.error?.code?.toString() || "API_ERROR",
+          response.status,
+          data.error
+        );
+      }
+
+      // Sprawdź czy mamy poprawną odpowiedź
+      if (!data.choices?.[0]?.message?.content) {
+        this._logger.error("Invalid API response format", { data });
+        throw new Error(`Invalid response format from OpenRouter API. Response: ${JSON.stringify(data)}`);
+      }
+
       return {
         success: true,
         data: {
@@ -446,14 +632,30 @@ export class OpenRouterService {
   }
 
   private _shouldRetry(error: unknown): boolean {
-    if (error instanceof OpenRouterError) {
-      const shouldRetry = !["AUTHENTICATION_ERROR", "VALIDATION_ERROR"].includes(error.code);
-      this._logger.debug("Checking if error is retryable", {
-        errorCode: error.code,
-        shouldRetry,
-      });
-      return shouldRetry;
+    // Nigdy nie ponawiaj przy błędach rate limit
+    if (error instanceof OpenRouterRateLimitError) {
+      return false;
     }
+
+    // Nie ponawiaj przy błędach autoryzacji
+    if (error instanceof OpenRouterAuthenticationError) {
+      return false;
+    }
+
+    // Nie ponawiaj przy błędach walidacji
+    if (error instanceof OpenRouterValidationError) {
+      return false;
+    }
+
+    // Jeśli to jest błąd OpenRouter, sprawdź jego kod
+    if (error instanceof OpenRouterError) {
+      // Nie ponawiaj przy błędach 4xx (oprócz 408 Request Timeout i 429 Rate Limit, który jest już obsłużony)
+      if (error.status && error.status >= 400 && error.status < 500 && error.status !== 408) {
+        return false;
+      }
+    }
+
+    // Domyślnie pozwól na ponowienie dla innych błędów (np. sieciowych)
     return true;
   }
 

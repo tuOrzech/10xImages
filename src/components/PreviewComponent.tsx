@@ -185,8 +185,8 @@ export default function PreviewComponent({ jobId }: PreviewComponentProps) {
         isLoading: false,
         editedAltText: data.generated_alt_text,
         editedFilename: data.generated_filename_suggestion,
-        imageUrl: data.file_hash
-          ? `${import.meta.env.PUBLIC_SUPABASE_URL}/storage/v1/object/public/images/${data.file_hash}`
+        imageUrl: data.storage_path
+          ? `${import.meta.env.PUBLIC_SUPABASE_URL}/storage/v1/object/public/optimization-images/${data.storage_path}`
           : null,
       }));
     } catch (err) {

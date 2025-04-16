@@ -1,29 +1,5 @@
-import type { OptimizationJobDTO } from "@/types";
 import type { APIRoute } from "astro";
 import { z } from "zod";
-
-// Mock data for development
-const mockJobs = new Map<string, OptimizationJobDTO>([
-  [
-    "mock-job-1",
-    {
-      id: "mock-job-1",
-      user_id: "mock-user-id",
-      created_at: "2023-01-01T12:00:00Z",
-      updated_at: "2023-01-01T12:00:00Z",
-      original_filename: "mountain.jpg",
-      file_hash: "mock-file-hash-1",
-      status: "completed",
-      user_context_subject: "Landscape",
-      user_context_keywords: ["mountains", "sunset", "nature"],
-      generated_alt_text: "A serene mountain landscape at sunset with snow-capped peaks reflecting golden light",
-      generated_filename_suggestion: "mountain-sunset-landscape",
-      ai_detected_keywords: ["mountains", "sunset", "snow", "peaks", "landscape"],
-      ai_request_id: null,
-      error_message: null,
-    },
-  ],
-]);
 
 // Schema for validating update request
 const updateOptimizationJobSchema = z.object({
@@ -37,28 +13,8 @@ const updateOptimizationJobSchema = z.object({
 
 export const prerender = false;
 
-// Helper function to create a mock job
-function createMockJob(id: string): OptimizationJobDTO {
-  return {
-    id,
-    user_id: "mock-user-id",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    original_filename: "sample-image.jpg",
-    file_hash: `mock-file-hash-${id.substring(0, 8)}`,
-    status: "completed",
-    user_context_subject: "Sample Subject",
-    user_context_keywords: ["sample", "keywords"],
-    generated_alt_text: "A sample image showing the product in use",
-    generated_filename_suggestion: "sample-product-usage",
-    ai_detected_keywords: ["sample", "product", "usage"],
-    ai_request_id: null,
-    error_message: null,
-  };
-}
-
 // Get single optimization job
-export const GET: APIRoute = async ({ params }) => {
+export const GET: APIRoute = async ({ params, locals }) => {
   try {
     const { id } = params;
 
@@ -66,12 +22,14 @@ export const GET: APIRoute = async ({ params }) => {
       return new Response(JSON.stringify({ message: "Missing job ID" }), { status: 400 });
     }
 
-    // For any non-mocked ID, create a dynamic mock job
-    if (!mockJobs.has(id)) {
-      mockJobs.set(id, createMockJob(id));
-    }
+    const { data: job, error } = await locals.supabase.from("optimization_jobs").select().eq("id", id).single();
 
-    const job = mockJobs.get(id);
+    if (error) {
+      if (error.code === "PGRST116") {
+        return new Response(JSON.stringify({ message: "Optimization job not found" }), { status: 404 });
+      }
+      throw error;
+    }
 
     return new Response(JSON.stringify(job));
   } catch (error) {
@@ -81,7 +39,7 @@ export const GET: APIRoute = async ({ params }) => {
 };
 
 // Update optimization job
-export const PATCH: APIRoute = async ({ request, params }) => {
+export const PATCH: APIRoute = async ({ request, params, locals }) => {
   try {
     const { id } = params;
     if (!id) {
@@ -93,28 +51,28 @@ export const PATCH: APIRoute = async ({ request, params }) => {
       return new Response(JSON.stringify({ message: "Content-Type must be application/json" }), { status: 400 });
     }
 
-    // Check if job exists
-    if (!mockJobs.has(id)) {
-      return new Response(JSON.stringify({ message: "Optimization job not found" }), { status: 404 });
-    }
-
     const rawData = await request.json();
     const validatedData = updateOptimizationJobSchema.parse(rawData);
 
-    // Update the mock job
-    const job = mockJobs.get(id);
-    if (!job) {
-      return new Response(JSON.stringify({ message: "Optimization job not found" }), { status: 404 });
+    // Update the job in Supabase
+    const { data: job, error: updateError } = await locals.supabase
+      .from("optimization_jobs")
+      .update({
+        ...validatedData,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (updateError) {
+      if (updateError.code === "PGRST116") {
+        return new Response(JSON.stringify({ message: "Optimization job not found" }), { status: 404 });
+      }
+      throw updateError;
     }
 
-    const updatedJob: OptimizationJobDTO = {
-      ...job,
-      ...validatedData,
-      updated_at: new Date().toISOString(),
-    };
-    mockJobs.set(id, updatedJob);
-
-    return new Response(JSON.stringify(updatedJob));
+    return new Response(JSON.stringify(job));
   } catch (error) {
     if (error instanceof z.ZodError) {
       return new Response(
@@ -132,19 +90,45 @@ export const PATCH: APIRoute = async ({ request, params }) => {
 };
 
 // Delete optimization job
-export const DELETE: APIRoute = async ({ params }) => {
+export const DELETE: APIRoute = async ({ params, locals }) => {
   try {
     const { id } = params;
     if (!id) {
       return new Response(JSON.stringify({ message: "Job ID is required" }), { status: 400 });
     }
 
-    if (!mockJobs.has(id)) {
-      return new Response(JSON.stringify({ message: "Optimization job not found" }), { status: 404 });
+    // First get the job to check if it exists and get the storage path
+    const { data: job, error: getError } = await locals.supabase
+      .from("optimization_jobs")
+      .select("storage_path")
+      .eq("id", id)
+      .single();
+
+    if (getError) {
+      if (getError.code === "PGRST116") {
+        return new Response(JSON.stringify({ message: "Optimization job not found" }), { status: 404 });
+      }
+      throw getError;
     }
 
-    // Remove the job from mock data
-    mockJobs.delete(id);
+    // Delete the file from storage if we have a storage path
+    if (job?.storage_path) {
+      const { error: storageError } = await locals.supabase.storage
+        .from("optimization-images")
+        .remove([job.storage_path]);
+
+      if (storageError) {
+        console.error("Error deleting file from storage:", storageError);
+        // Continue with database deletion even if storage deletion fails
+      }
+    }
+
+    // Delete the database record
+    const { error: deleteError } = await locals.supabase.from("optimization_jobs").delete().eq("id", id);
+
+    if (deleteError) {
+      throw deleteError;
+    }
 
     return new Response(null, { status: 204 });
   } catch (error) {

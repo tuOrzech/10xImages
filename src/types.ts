@@ -2,10 +2,39 @@
 // These types are based on the database models defined in "src/db/database.types.ts"
 // and adhere to the API plan specified in ".ai/api-plan.md".
 
-import type { Database } from "./db/database.types";
-
-// DTO representing an optimization job returned by the API.
-export type OptimizationJobDTO = Database["public"]["Tables"]["optimization_jobs"]["Row"];
+// DTO representing an optimization job record.
+export interface OptimizationJobDTO {
+  // Unique identifier for the job.
+  id: string;
+  // Reference to the user who created the job.
+  user_id: string;
+  // Timestamp when the job was created.
+  created_at: string;
+  // Timestamp when the job was last updated.
+  updated_at: string;
+  // Original name of the uploaded file.
+  original_filename: string;
+  // Hash of the file content for deduplication.
+  file_hash: string | null;
+  // Full path to the file in Supabase Storage.
+  storage_path: string;
+  // Current status of the job.
+  status: "pending" | "processing" | "completed" | "failed";
+  // Optional subject context provided by the user.
+  user_context_subject?: string | null;
+  // Optional keywords provided by the user.
+  user_context_keywords?: string[] | null;
+  // AI-generated alt text for the image.
+  generated_alt_text?: string | null;
+  // AI-suggested SEO-friendly filename.
+  generated_filename_suggestion?: string | null;
+  // Reference ID for the AI service request.
+  ai_request_id?: string | null;
+  // Keywords detected by AI from the image.
+  ai_detected_keywords?: string[] | null;
+  // Error message if the job failed.
+  error_message?: string | null;
+}
 
 // Command model for creating a new optimization job.
 // Contains fields expected in the multipart/form-data request.
