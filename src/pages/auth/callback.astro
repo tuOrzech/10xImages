@@ -1,0 +1,16 @@
+---
+// Strona callback jest tylko przekierowaniem do API endpointu
+const code = Astro.url.searchParams.get("code");
+
+if (!code) {
+  return Astro.redirect("/auth/login?error=invalid_callback");
+}
+
+// Przekieruj do API endpointu z zachowaniem parametrów
+return Astro.redirect(`/api/auth/callback?code=${code}`);
+
+// Dodaj export prerender = false aby wymusić SSR
+export const prerender = false;
+---
+
+<!-- Ta strona nie renderuje żadnego HTML, służy tylko do przekierowania -->

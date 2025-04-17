@@ -1,5 +1,6 @@
 ---
 import LoginForm from "../../components/auth/LoginForm";
+import {Alert, AlertDescription} from "../../components/ui/alert";
 import {createSupabaseServerInstance} from "../../db/supabase.client";
 import Layout from "../../layouts/Layout.astro";
 
@@ -18,6 +19,18 @@ if (user) {
   return Astro.redirect("/dashboard");
 }
 
+const error = Astro.url.searchParams.get("error");
+const message = Astro.url.searchParams.get("message");
+
+const errorMessages = {
+  missing_token: "Brak tokenu autoryzacji. Spróbuj ponownie.",
+  invalid_token: "Nieprawidłowy token autoryzacji. Spróbuj ponownie.",
+} as const;
+
+const successMessages = {
+  email_confirmed: "Email został potwierdzony. Możesz się teraz zalogować.",
+} as const;
+
 export const prerender = false;
 ---
 
@@ -25,6 +38,20 @@ export const prerender = false;
   <main class='container mx-auto py-8 px-4'>
     <div class='max-w-md mx-auto'>
       <h1 class='text-3xl font-bold mb-6 text-center'>Logowanie</h1>
+      {
+        error && errorMessages[error as keyof typeof errorMessages] && (
+          <Alert variant='destructive' className='mb-6'>
+            <AlertDescription>{errorMessages[error as keyof typeof errorMessages]}</AlertDescription>
+          </Alert>
+        )
+      }
+      {
+        message && successMessages[message as keyof typeof successMessages] && (
+          <Alert variant='default' className='mb-6'>
+            <AlertDescription>{successMessages[message as keyof typeof successMessages]}</AlertDescription>
+          </Alert>
+        )
+      }
       <LoginForm client:load />
     </div>
   </main>
