@@ -1,11 +1,15 @@
 /// <reference types="astro/client" />
 
 import type { supabaseClient } from "./db/supabase.client";
-
+interface User {
+  email: string;
+  id: string;
+}
 declare global {
   namespace App {
     interface Locals {
       supabase: typeof supabaseClient;
+      user?: User;
     }
   }
 }

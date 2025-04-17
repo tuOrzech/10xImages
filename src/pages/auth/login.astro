@@ -1,12 +1,30 @@
 ---
 import LoginForm from "../../components/auth/LoginForm";
+import {createSupabaseServerInstance} from "../../db/supabase.client";
 import Layout from "../../layouts/Layout.astro";
+
+// Sprawdź czy użytkownik jest już zalogowany
+const supabase = createSupabaseServerInstance({
+  cookies: Astro.cookies,
+  headers: Astro.request.headers,
+});
+
+const {
+  data: {user},
+} = await supabase.auth.getUser();
+
+// Jeśli użytkownik jest zalogowany, przekieruj do dashboardu
+if (user) {
+  return Astro.redirect("/dashboard");
+}
+
+export const prerender = false;
 ---
 
-<Layout title='Login - AltImageOptimizer'>
+<Layout title='Logowanie - AltImageOptimizer'>
   <main class='container mx-auto py-8 px-4'>
     <div class='max-w-md mx-auto'>
-      <h1 class='text-3xl font-bold mb-6 text-center'>Login</h1>
+      <h1 class='text-3xl font-bold mb-6 text-center'>Logowanie</h1>
       <LoginForm client:load />
     </div>
   </main>

@@ -89,3 +89,13 @@ export interface ListOptimizationJobsQueryDTO {
   // e.g., "created_at_desc" to denote sorting order.
   sort?: string;
 }
+
+export interface User {
+  id: string;
+  email: string;
+}
+
+export interface AuthResponse {
+  user: User | null;
+  error?: string;
+}

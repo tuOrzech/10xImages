@@ -1,29 +1,34 @@
 ---
-import {Toaster} from "@/components/ui/sonner";
+import {ClientRouter} from "astro:transitions";
+import AuthWrapper from "../components/auth/AuthWrapper";
 import {ThemeProvider} from "../components/ui/theme-provider";
 import "../styles/global.css";
 
 interface Props {
-  title?: string;
+  title: string;
 }
 
-const {title = "AltImageOptimizer"} = Astro.props;
+const {title} = Astro.props;
+const {user} = Astro.locals;
 ---
 
 <!doctype html>
 <html lang='pl'>
   <head>
     <meta charset='UTF-8' />
+    <meta name='description' content='AltImageOptimizer - optymalizacja obrazów dla stron internetowych' />
     <meta name='viewport' content='width=device-width' />
-    <link rel='icon' type='image/png' href='/favicon.png' />
+    <link rel='icon' type='image/svg+xml' href='/favicon.svg' />
     <meta name='generator' content={Astro.generator} />
     <title>{title}</title>
+    <ClientRouter />
   </head>
-  <body class='min-h-screen bg-background antialiased'>
+  <body>
     <ThemeProvider client:load>
-      <slot />
+      <AuthWrapper client:only='react' initialUser={user}>
+        <slot />
+      </AuthWrapper>
     </ThemeProvider>
-    <Toaster client:load richColors />
   </body>
 </html>
 

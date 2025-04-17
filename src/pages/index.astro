@@ -1,8 +1,73 @@
 ---
-import Welcome from "../components/Welcome.astro";
+import UploadForm from "../components/UploadForm";
+import {createSupabaseServerInstance} from "../db/supabase.client";
 import Layout from "../layouts/Layout.astro";
+
+// Sprawdź status autentykacji
+const supabase = createSupabaseServerInstance({
+  cookies: Astro.cookies,
+  headers: Astro.request.headers,
+});
+
+const {
+  data: {user},
+} = await supabase.auth.getUser();
+
+export const prerender = false;
 ---
 
-<Layout>
-  <Welcome />
+<Layout title='AltImageOptimizer - Optymalizacja obrazów z AI'>
+  <main class='container mx-auto py-8 px-4'>
+    <div class='max-w-4xl mx-auto'>
+      <div class='flex justify-between items-center mb-8'>
+        <h1 class='text-3xl font-bold'>Optymalizacja obrazów</h1>
+        {user && <p class='text-gray-600'>Witaj, {user.email}</p>}
+      </div>
+
+      <div class='grid grid-cols-1 gap-8'>
+        <div class='bg-white p-6 rounded-lg shadow-md'>
+          <UploadForm client:load />
+        </div>
+
+        {
+          user && (
+            <div class='grid grid-cols-1 md:grid-cols-2 gap-6'>
+              <div class='bg-white p-6 rounded-lg shadow-md'>
+                <h2 class='text-xl font-semibold mb-4'>Historia Optymalizacji</h2>
+                <p class='text-gray-600 mb-4'>Przeglądaj i zarządzaj swoją historią optymalizacji obrazów.</p>
+                <a href='/history' class='text-blue-600 hover:underline'>
+                  Przejdź do historii →
+                </a>
+              </div>
+
+              <div class='bg-white p-6 rounded-lg shadow-md'>
+                <h2 class='text-xl font-semibold mb-4'>Kolekcje</h2>
+                <p class='text-gray-600 mb-4'>Zarządzaj swoimi kolekcjami zoptymalizowanych obrazów.</p>
+                <a href='/collections' class='text-blue-600 hover:underline'>
+                  Przejdź do kolekcji →
+                </a>
+              </div>
+            </div>
+          )
+        }
+
+        {
+          !user && (
+            <div class='bg-white p-6 rounded-lg shadow-md text-center'>
+              <p class='text-gray-600 mb-4'>Zaloguj się, aby uzyskać dostęp do historii optymalizacji i kolekcji.</p>
+              <div class='space-x-4'>
+                <a href='/auth/login' class='text-blue-600 hover:underline'>
+                  Zaloguj się
+                </a>
+                <span class='text-gray-400'>lub</span>
+                <a href='/auth/register' class='text-blue-600 hover:underline'>
+                  Zarejestruj się
+                </a>
+              </div>
+            </div>
+          )
+        }
+      </div>
+    </div>
+  </main>
 </Layout>
