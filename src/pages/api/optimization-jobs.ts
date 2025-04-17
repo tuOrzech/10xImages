@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { z } from "zod";
 import { DEFAULT_USER_ID, supabaseClient } from "../../db/supabase.client";
+import { OpenRouterRateLimitError } from "../../lib/services/openrouter.service";
 import { OptimizationService } from "../../lib/services/optimization.service";
 
 // Schema for validating multipart/form-data request
@@ -42,9 +43,14 @@ export const prerender = false;
 // Create optimization job
 export const POST: APIRoute = async ({ request }) => {
   try {
+    console.log("[API] POST /api/optimization-jobs - Starting request processing");
+
     // Validate request content type
     const contentType = request.headers.get("content-type");
+    console.log("[API] Request content-type:", contentType);
+
     if (!contentType?.includes("multipart/form-data")) {
+      console.error("[API] Invalid content type:", contentType);
       return new Response(
         JSON.stringify({
           error: "Request must be multipart/form-data",
@@ -57,6 +63,7 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     // Parse and validate form data
+    console.log("[API] Parsing form data");
     const formData = await request.formData();
     const rawData = {
       image: formData.get("image"),
@@ -65,73 +72,100 @@ export const POST: APIRoute = async ({ request }) => {
       user_context_keywords: formData.getAll("user_context_keywords"),
     };
 
-    const validatedData = createOptimizationJobSchema.parse(rawData);
-
-    // Create optimization service
-    const optimizationService = new OptimizationService(supabaseClient, supabaseClient.storage);
-
-    // Create optimization job
-    const { data: job, error } = await optimizationService.createOptimizationJob({
-      userId: DEFAULT_USER_ID,
-      image: validatedData.image,
-      originalFilename: validatedData.original_filename,
-      userContextSubject: validatedData.user_context_subject,
-      userContextKeywords: validatedData.user_context_keywords,
+    console.log("[API] Validating form data", {
+      hasImage: !!rawData.image,
+      filename: rawData.original_filename,
+      hasSubject: !!rawData.user_context_subject,
+      keywordsCount: rawData.user_context_keywords.length,
     });
 
-    if (error) {
-      // Handle duplicate file case
-      if (error.message === "File has already been optimized") {
+    try {
+      const validatedData = createOptimizationJobSchema.parse(rawData);
+      console.log("[API] Form data validated successfully");
+
+      // Create optimization service
+      console.log("[API] Initializing OptimizationService");
+      const optimizationService = new OptimizationService(supabaseClient, supabaseClient.storage);
+
+      // Create optimization job
+      console.log("[API] Creating optimization job");
+      const { data: job, error } = await optimizationService.createOptimizationJob({
+        userId: DEFAULT_USER_ID,
+        image: validatedData.image,
+        originalFilename: validatedData.original_filename,
+        userContextSubject: validatedData.user_context_subject,
+        userContextKeywords: validatedData.user_context_keywords,
+      });
+
+      if (error) {
+        console.error("[API] Error creating optimization job:", error);
+
+        if (error instanceof OpenRouterRateLimitError) {
+          return new Response(
+            JSON.stringify({
+              error: error.message,
+              rate_limit_error: true,
+            }),
+            {
+              status: 429,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
         return new Response(
           JSON.stringify({
-            message: "File has already been optimized",
-            data: job,
+            error: error.message,
           }),
           {
-            status: 200,
+            status: 500,
             headers: { "Content-Type": "application/json" },
           }
         );
       }
 
-      // Handle other errors
-      console.error("Error creating optimization job:", error);
-      return new Response(
-        JSON.stringify({
-          error: error.message,
-        }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    return new Response(
-      JSON.stringify({
-        message: "Optimization job created successfully",
-        data: job,
-      }),
-      {
-        status: 201,
-        headers: { "Content-Type": "application/json" },
+      if (!job) {
+        console.error("[API] No job data returned");
+        return new Response(
+          JSON.stringify({
+            error: "Failed to create optimization job",
+          }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
       }
-    );
-  } catch (error) {
-    if (error instanceof z.ZodError) {
+
+      console.log("[API] Optimization job created successfully", { jobId: job.id });
+
       return new Response(
         JSON.stringify({
-          error: "Validation error",
-          details: error.errors,
+          data: job,
         }),
         {
-          status: 400,
+          status: 201,
           headers: { "Content-Type": "application/json" },
         }
       );
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        console.error("[API] Validation error:", err.errors);
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            details: err.errors,
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+      throw err;
     }
-
-    console.error("Error processing optimization job:", error);
+  } catch (error) {
+    console.error("[API] Unhandled error processing request:", error);
     return new Response(
       JSON.stringify({
         error: "Internal server error",

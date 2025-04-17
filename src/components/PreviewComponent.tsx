@@ -179,6 +179,50 @@ export default function PreviewComponent({ jobId }: PreviewComponentProps) {
       }
 
       const data = await response.json();
+      console.log("[PreviewComponent] Received job data:", data);
+
+      // Check if the job is still processing or failed
+      if (data.status === "processing" || data.status === "pending") {
+        setViewModel((prev) => ({
+          ...prev,
+          job: data,
+          isLoading: false,
+          error: "Zadanie jest w trakcie przetwarzania. Odśwież stronę za chwilę, aby sprawdzić wyniki.",
+        }));
+        return;
+      }
+
+      if (data.status === "failed") {
+        setViewModel((prev) => ({
+          ...prev,
+          job: data,
+          isLoading: false,
+          error: data.error_message || "Wystąpił błąd podczas generowania sugestii. Spróbuj ponownie później.",
+        }));
+        return;
+      }
+
+      // Check if we have AI-generated content
+      if (!data.generated_alt_text && !data.generated_filename_suggestion) {
+        console.warn("[PreviewComponent] Job completed but missing AI suggestions");
+
+        // Zainicjuj puste wartości
+        setViewModel((prev) => ({
+          ...prev,
+          job: data,
+          isLoading: false,
+          editedAltText:
+            "Brak sugerowanego tekstu alternatywnego. Użyj przycisk 'Ponów', aby spróbować wygenerować nowe sugestie.",
+          editedFilename: "brak-sugerowanej-nazwy",
+          error:
+            "Nie udało się wygenerować sugestii przez AI. Możesz samodzielnie wprowadzić tekst alternatywny lub ponowić próbę.",
+          imageUrl: data.storage_path
+            ? `${import.meta.env.PUBLIC_SUPABASE_URL}/storage/v1/object/public/optimization-images/${data.storage_path}`
+            : null,
+        }));
+        return;
+      }
+
       setViewModel((prev) => ({
         ...prev,
         job: data,

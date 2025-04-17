@@ -46,6 +46,7 @@ export class OptimizationService {
     userContextSubject?: string;
     userContextKeywords?: string[];
     imageUrl: string;
+    storagePath: string;
   }): Promise<{ alt: string | null; filename: string | null; error?: Error }> {
     try {
       // Format the message to match our system prompt expectations
@@ -57,39 +58,92 @@ export class OptimizationService {
         .filter(Boolean)
         .join("\n");
 
-      // Ensure we have a full URL
-      const imageUrl = params.imageUrl.startsWith("http")
-        ? params.imageUrl
-        : this.supabase.storage.from("optimization-images").getPublicUrl(params.imageUrl).data?.publicUrl;
+      console.log("[OptimizationService] Preparing image for OpenRouter");
 
-      if (!imageUrl) {
-        throw new Error("Failed to get public URL for image");
+      // Download the image from storage and convert to base64
+      try {
+        // Download the image from Supabase Storage using the correct bucket name
+        const { data, error } = await this.supabase.storage.from("optimization-images").download(params.storagePath);
+
+        if (error || !data) {
+          console.error("[OptimizationService] Error downloading image from storage:", error);
+          throw new Error("Failed to download image from storage");
+        }
+
+        // Get the file extension from the storage path
+        const fileExtension = params.storagePath.split(".").pop()?.toLowerCase();
+        let mimeType = "image/jpeg"; // default fallback
+
+        // Map file extensions to MIME types
+        switch (fileExtension) {
+          case "png":
+            mimeType = "image/png";
+            break;
+          case "webp":
+            mimeType = "image/webp";
+            break;
+          case "jpg":
+          case "jpeg":
+            mimeType = "image/jpeg";
+            break;
+        }
+
+        // Convert to base64
+        const arrayBuffer = await data.arrayBuffer();
+        const base64 = Buffer.from(arrayBuffer).toString("base64");
+        const imageBase64 = `data:${mimeType};base64,${base64}`;
+
+        console.log("[OptimizationService] Image successfully converted to base64");
+
+        // Send request to OpenRouter with base64 image
+        const response = await this.openRouter.sendRequest(imageContext, imageBase64);
+
+        if (!response.success || !response.data) {
+          console.error("[OptimizationService] OpenRouter request failed", {
+            success: response.success,
+            message: response.message,
+            data: response.data,
+          });
+          throw new Error(response.message || "Failed to generate image description");
+        }
+
+        console.log("[OptimizationService] OpenRouter response received", {
+          success: response.success,
+          hasChoices: !!response.data.choices?.length,
+        });
+
+        const content = response.data.choices?.[0]?.message?.content || "";
+        const [altMatch, filenameMatch] = content
+          .split("\n")
+          .filter((line: string) => line.startsWith("Alt:") || line.startsWith("Nazwa:"));
+
+        if (!altMatch && !filenameMatch) {
+          console.error("[OptimizationService] Invalid response format", { content });
+          throw new Error("Response does not contain Alt or Nazwa fields");
+        }
+
+        return {
+          alt: altMatch ? altMatch.replace("Alt:", "").trim() : null,
+          filename: filenameMatch ? filenameMatch.replace("Nazwa:", "").trim().replace(".webp", "") : null,
+        };
+      } catch (error) {
+        console.error("[OptimizationService] Error preparing or processing image:", error);
+        throw error;
       }
-
-      // Send request to OpenRouter with image URL
-      const response = await this.openRouter.sendRequest(imageContext, imageUrl);
-
-      if (!response.success) {
-        throw new Error(response.message || "Failed to generate image description");
-      }
-
-      const content = response.data.content || "";
-      const [altMatch, filenameMatch] = content
-        .split("\n")
-        .filter((line) => line.startsWith("Alt:") || line.startsWith("Nazwa:"));
-
-      return {
-        alt: altMatch ? altMatch.replace("Alt:", "").trim() : null,
-        filename: filenameMatch ? filenameMatch.replace("Nazwa:", "").trim().replace(".webp", "") : null,
-      };
     } catch (error) {
-      console.error("Error generating image description:", error);
+      console.error("[OptimizationService] Error generating image description:", error);
       return {
         alt: null,
         filename: null,
         error: error instanceof Error ? error : new Error("Failed to generate description"),
       };
     }
+  }
+
+  private getPublicImageUrl(storagePath: string): string {
+    const { data } = this.supabase.storage.from("images").getPublicUrl(storagePath);
+
+    return data.publicUrl;
   }
 
   async createOptimizationJob({
@@ -136,7 +190,8 @@ export class OptimizationService {
       } = await this.generateImageDescription({
         userContextSubject,
         userContextKeywords,
-        imageUrl: storagePath,
+        imageUrl: this.getPublicImageUrl(storagePath),
+        storagePath: storagePath,
       });
 
       if (aiError) {
@@ -157,7 +212,7 @@ export class OptimizationService {
 
         // Dla innych błędów tworzymy rekord failed
         console.warn("[OptimizationService] Creating failed job record for non-rate-limit error");
-        const { data: job, error: dbError } = await this.supabase
+        const { data: jobRecord, error: dbError } = await this.supabase
           .from("optimization_jobs")
           .insert({
             user_id: userId,
@@ -180,6 +235,7 @@ export class OptimizationService {
         console.warn("[OptimizationService] Failed job record created successfully");
         // Propagate the error to the frontend, but also return the job data
         return {
+          data: jobRecord ? { ...jobRecord, storage_path: storagePath } : undefined,
           error: aiError,
         };
       }
@@ -380,6 +436,7 @@ export class OptimizationService {
         userContextSubject: job.user_context_subject || undefined,
         userContextKeywords: job.user_context_keywords || undefined,
         imageUrl: job.storage_path,
+        storagePath: job.storage_path,
       });
 
       if (aiError) {

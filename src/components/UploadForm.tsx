@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Toaster } from "@/components/ui/sonner";
 import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { createOptimizationJob } from "../lib/services/api.service";
@@ -159,8 +158,6 @@ export default function UploadForm() {
           "Prześlij obraz"
         )}
       </Button>
-
-      <Toaster richColors />
     </form>
   );
 }

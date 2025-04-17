@@ -14,10 +14,14 @@ const PUBLIC_PATHS = [
   // Strona główna i przesyłanie pojedynczych obrazów
   "/",
   "/upload",
+  "/preview",
 ];
 
 // Prefiksy ścieżek publicznych - wszystkie ścieżki zaczynające się od tych prefiksów będą publiczne
-const PUBLIC_PATH_PREFIXES = ["/api/optimization-jobs"];
+const PUBLIC_PATH_PREFIXES = [
+  "/api/optimization-jobs",
+  "/preview/", // Dodajemy prefiks dla stron podglądu, np. /preview/123
+];
 
 export const onRequest = defineMiddleware(async ({ locals, cookies, url, request, redirect }, next) => {
   // Inicjalizacja klienta Supabase

@@ -58,19 +58,21 @@ export const rateLimitConfigSchema = z.object({
 // Response schema validation
 export const responseSchema = z.object({
   success: z.boolean(),
-  message: z.string(),
-  data: z.object({
-    content: z.string().optional(),
-    model: z.string().optional(),
-    usage: z
-      .object({
-        prompt_tokens: z.number().optional(),
-        completion_tokens: z.number().optional(),
-        total_tokens: z.number().optional(),
-      })
-      .optional(),
-    error: z.string().optional(),
-  }),
+  message: z.string().optional(),
+  data: z
+    .object({
+      id: z.string(),
+      model: z.string(),
+      choices: z.array(
+        z.object({
+          message: z.object({
+            role: z.string(),
+            content: z.string(),
+          }),
+        })
+      ),
+    })
+    .optional(),
 });
 
 // Export inferred types

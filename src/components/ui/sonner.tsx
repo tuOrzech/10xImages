@@ -15,7 +15,7 @@ interface ToasterProps {
   theme?: "light" | "dark" | "system";
 }
 
-const Toaster = ({ theme = "system", ...props }: ToasterProps) => {
+const Toaster = ({ theme = "system", position = "bottom-right", ...props }: ToasterProps) => {
   // Wykorzystujemy preferencję systemową, gdy theme jest ustawiony na "system"
   const systemPrefersDark =
     typeof window !== "undefined" ? window.matchMedia("(prefers-color-scheme: dark)").matches : false;
@@ -25,12 +25,19 @@ const Toaster = ({ theme = "system", ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={resolvedTheme as "light" | "dark"}
+      position={position}
       className="toaster group"
       style={
         {
           "--normal-bg": "var(--popover)",
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
+          "--success-bg": "var(--success)",
+          "--success-text": "var(--success-foreground)",
+          "--error-bg": "var(--destructive)",
+          "--error-text": "var(--destructive-foreground)",
+          "--info-bg": "var(--info)",
+          "--info-text": "var(--info-foreground)",
         } as React.CSSProperties
       }
       {...props}

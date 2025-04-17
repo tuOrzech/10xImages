@@ -1,5 +1,5 @@
 import type { ConfigType, RateLimitConfig as RateLimitConfigType, Response, SystemPrompt } from "./openrouter.types";
-import { configSchema, messageSchema, rateLimitConfigSchema, responseSchema } from "./openrouter.types";
+import { configSchema, rateLimitConfigSchema } from "./openrouter.types";
 
 // OpenRouter specific error types
 class OpenRouterError extends Error {
@@ -67,6 +67,17 @@ interface ApiErrorResponse {
       type?: string;
     };
   };
+}
+
+interface OpenRouterResponse {
+  id: string;
+  model: string;
+  choices: {
+    message: {
+      role: string;
+      content: string;
+    };
+  }[];
 }
 
 // Logger interface for dependency injection
@@ -139,7 +150,7 @@ export class OpenRouterService {
       defaultModel: import.meta.env.OPENROUTER_DEFAULT_MODEL || "qwen/qwen2.5-vl-72b-instruct:free",
       modelParams: {
         temperature: 0.7,
-        maxTokens: 4096,
+        maxTokens: 10000,
         topP: 1.0,
       },
       systemPrompt: {
@@ -436,91 +447,78 @@ PAMIĘTAJ:
   /**
    * Send a request to OpenRouter API
    */
-  public async sendRequest(message: string, imageUrl?: string): Promise<Response> {
+  public async sendRequest(
+    context: string,
+    imageSource: string
+  ): Promise<{ success: boolean; data?: OpenRouterResponse; message?: string }> {
     try {
-      this._logger.info("Starting new request to OpenRouter", {
-        hasImage: !!imageUrl,
-        messageLength: message.length,
-      });
-
-      this._logger.debug("Validating input message and preparing payload");
-
-      // Validate the input message
-      messageSchema.parse(message);
-
-      // Prepare message content based on whether we have an image
-      const messageContent = imageUrl
-        ? [
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this._apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://altimgoptimizer.vercel.app",
+          "X-Title": "AltImgOptimizer",
+        },
+        body: JSON.stringify({
+          model: this.config.defaultModel,
+          max_tokens: this.config.modelParams.maxTokens,
+          messages: [
             {
-              type: "image_url" as const,
-              image_url: {
-                url: imageUrl,
-                detail: "high" as const,
-              },
+              role: "system",
+              content: this.config.systemPrompt.content,
             },
             {
-              type: "text" as const,
-              text: message,
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: context,
+                },
+                {
+                  type: "image_url",
+                  image_url: imageSource,
+                },
+              ],
             },
-          ]
-        : message;
-
-      // Create the user message
-      const userMessage: Message = {
-        role: "user",
-        content: messageContent,
-      };
-
-      this._logger.info("Checking rate limits...");
-      this._checkRateLimit();
-      const rateLimitStatus = this.getRateLimitStatus();
-      this._logger.info("Rate limit status", {
-        minuteRequestsRemaining: rateLimitStatus.minuteRequestsRemaining,
-        hourRequestsRemaining: rateLimitStatus.hourRequestsRemaining,
+          ],
+        }),
       });
 
-      this._logger.debug("Preparing request payload");
-      const payload = this._preparePayload(userMessage);
-
-      this._logger.info("Sending request to OpenRouter API", {
-        model: payload.model,
-        hasImage: !!imageUrl,
-        imageUrl: imageUrl ? `${imageUrl.substring(0, 50)}...` : undefined,
-      });
-
-      const response = await this._sendRequestWithRetry(payload);
-
-      this._logger.debug("Validating API response");
-      const validatedResponse = responseSchema.parse(response);
-      this.lastResponse = validatedResponse;
-
-      this._logger.info("Request completed successfully", {
-        model: response.data.model,
-        usage: response.data.usage,
-        contentLength: response.data.content?.length ?? 0,
-      });
-
-      return validatedResponse;
-    } catch (error) {
-      this._logger.error("Failed to process request", {
-        error: error instanceof Error ? error.message : "Unknown error",
-        name: error instanceof Error ? error.name : undefined,
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-
-      // Dodaj dodatkowy log dla błędu rate limit
-      if (error instanceof OpenRouterRateLimitError) {
-        console.error("[OpenRouter] Rate Limit Error:", error.message);
+      if (!response.ok) {
+        const errorData = await response.json();
+        this._logger.error("[OpenRouterService] API error:", errorData);
+        return {
+          success: false,
+          message: errorData.error?.message || "API request failed",
+        };
       }
 
-      const errorResponse: Response = {
+      const data = await response.json();
+      this._logger.debug("[OpenRouterService] API response:", data);
+
+      if (!data.id || !data.choices?.[0]?.message?.content) {
+        this._logger.error("[OpenRouterService] Invalid response format:", data);
+        return {
+          success: false,
+          message: "Invalid response format from API",
+        };
+      }
+
+      return {
+        success: true,
+        data: {
+          id: data.id,
+          model: data.model,
+          choices: data.choices,
+        },
+      };
+    } catch (error) {
+      this._logger.error("[OpenRouterService] Error:", error);
+      return {
         success: false,
-        data: error instanceof Error ? { error: error.message } : { error: "Unknown error occurred" },
         message: error instanceof Error ? error.message : "Unknown error occurred",
       };
-      this.lastResponse = errorResponse;
-
-      throw error;
     }
   }
 
@@ -609,9 +607,9 @@ PAMIĘTAJ:
       return {
         success: true,
         data: {
-          content: data.choices[0].message.content,
+          id: data.id,
           model: data.model,
-          usage: data.usage,
+          choices: data.choices,
         },
         message: "Request successful",
       };

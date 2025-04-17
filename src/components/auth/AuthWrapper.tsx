@@ -14,7 +14,7 @@ export default function AuthWrapper({ initialUser, children }: AuthWrapperProps)
     <AuthProvider initialUser={initialUser}>
       <Navigation />
       {children}
-      <Toaster richColors />
+      <Toaster richColors position="bottom-right" duration={3000} closeButton visibleToasts={3} theme="system" />
     </AuthProvider>
   );
 }
