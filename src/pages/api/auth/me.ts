@@ -4,6 +4,14 @@ import { createSupabaseServerInstance } from "../../../db/supabase.client";
 export const prerender = false;
 
 export const GET: APIRoute = async ({ cookies, request }) => {
+  // Set common headers for all responses
+  const commonHeaders = {
+    "Content-Type": "application/json",
+    "Cache-Control": "private, no-cache, no-store, must-revalidate",
+    Expires: "0",
+    Pragma: "no-cache",
+  };
+
   try {
     const supabase = createSupabaseServerInstance({
       cookies,
@@ -11,33 +19,41 @@ export const GET: APIRoute = async ({ cookies, request }) => {
     });
 
     const {
-      data: { user },
-    } = await supabase.auth.getUser();
+      data: { session },
+    } = await supabase.auth.getSession();
 
-    if (!user) {
-      return new Response(JSON.stringify({ user: null }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
+    // Always return 200 with user data or null
     return new Response(
       JSON.stringify({
-        user: {
-          id: user.id,
-          email: user.email,
-        },
+        user: session
+          ? {
+              id: session.user.id,
+              email: session.user.email,
+            }
+          : null,
       }),
       {
         status: 200,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          ...commonHeaders,
+          // Add cache control for authenticated users
+          ...(session && {
+            "Cache-Control": `private, max-age=${session.expires_in ?? 3600}`,
+          }),
+        },
       }
     );
   } catch (error) {
     console.error("Error in /api/auth/me:", error);
-    return new Response(JSON.stringify({ error: "Internal server error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        user: null,
+        error: "Internal server error",
+      }),
+      {
+        status: 200, // Still return 200 to avoid redirect
+        headers: commonHeaders,
+      }
+    );
   }
 };

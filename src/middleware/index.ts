@@ -11,6 +11,7 @@ const PUBLIC_PATHS = [
   "/api/auth/login",
   "/api/auth/register",
   "/api/auth/password-recovery",
+  "/api/auth/me",
   // Strona główna i przesyłanie pojedynczych obrazów
   "/",
   "/upload",

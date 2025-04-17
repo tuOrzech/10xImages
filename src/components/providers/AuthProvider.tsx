@@ -4,6 +4,7 @@ import type { AuthResponse, User } from "../../types";
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
+  error: string | null;
   logout: () => Promise<void>;
 }
 
@@ -25,30 +26,56 @@ interface AuthProviderProps {
 export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(initialUser ?? null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check auth status on mount and when window gains focus
     const checkAuth = async () => {
       try {
-        const response = await fetch("/api/auth/me");
-        if (response.ok) {
-          const data: AuthResponse = await response.json();
-          setUser(data.user);
-        } else {
-          setUser(null);
+        setIsLoading(true);
+        setError(null);
+
+        const response = await fetch("/api/auth/me", {
+          headers: {
+            Accept: "application/json",
+          },
+        });
+
+        // Validate that we got JSON response
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("Invalid response from server");
+        }
+
+        const data: AuthResponse = await response.json();
+        setUser(data.user);
+
+        if (data.error) {
+          setError(data.error);
         }
       } catch (error) {
         console.error("Error checking auth status:", error);
-        setUser(null);
+        setError(error instanceof Error ? error.message : "Unknown error occurred");
+        // Don't reset user state on error to avoid flickering
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    checkAuth();
+    // Check auth only if we don't have initialUser
+    if (!initialUser) {
+      checkAuth();
+    }
 
-    // Check auth status when window gains focus
-    window.addEventListener("focus", checkAuth);
-    return () => window.removeEventListener("focus", checkAuth);
-  }, []);
+    // Check auth when window regains focus
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkAuth();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [initialUser]);
 
   const logout = async () => {
     setIsLoading(true);
@@ -63,10 +90,11 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       }
     } catch (error) {
       console.error("Error during logout:", error);
+      setError(error instanceof Error ? error.message : "Error during logout");
     } finally {
       setIsLoading(false);
     }
   };
 
-  return <AuthContext.Provider value={{ user, isLoading, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, isLoading, error, logout }}>{children}</AuthContext.Provider>;
 }
