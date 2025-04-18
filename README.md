@@ -11,6 +11,9 @@ AltImageOptimizer is a web-based application designed to optimize images for web
 - **AI Integration:** OpenRouter.ai (access to models such as OpenAI, Anthropic, Google, etc.)
 - **Image Processing:** Sharp (for image conversion to WebP, resizing, and quality optimization)
 - **CI/CD and Hosting:** GitHub Actions, DigitalOcean (Docker)
+- **Testing:**
+  - **Unit/Integration:** Vitest, React Testing Library
+  - **E2E:** Playwright
 
 ## Getting Started Locally
 

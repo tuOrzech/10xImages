@@ -62,7 +62,7 @@ export const POST: APIRoute = async ({ request }) => {
       );
     }
 
-    // Parse and validate form data
+    // Parse form data
     console.log("[API] Parsing form data");
     const formData = await request.formData();
     const rawData = {
@@ -71,6 +71,56 @@ export const POST: APIRoute = async ({ request }) => {
       user_context_subject: formData.get("user_context_subject"),
       user_context_keywords: formData.getAll("user_context_keywords"),
     };
+
+    // Early file validation
+    const file = rawData.image;
+    if (!file || !(file instanceof File)) {
+      console.warn("[API] No file uploaded or invalid file object");
+      return new Response(
+        JSON.stringify({
+          error: "No file uploaded or invalid file object",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    console.info("[API] File received", {
+      type: file.type,
+      size: Math.round(file.size / 1024) + "KB",
+      name: file.name,
+    });
+
+    // Validate file type and size before schema validation
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      console.warn("[API] Invalid file type", { type: file.type });
+      return new Response(
+        JSON.stringify({
+          error: "Invalid file type. Only JPG, PNG and WebP files are allowed.",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      console.warn("[API] File too large", {
+        size: Math.round(file.size / 1024 / 1024) + "MB",
+      });
+      return new Response(
+        JSON.stringify({
+          error: "File size must be less than 10MB",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
 
     console.log("[API] Validating form data", {
       hasImage: !!rawData.image,
@@ -98,7 +148,11 @@ export const POST: APIRoute = async ({ request }) => {
       });
 
       if (error) {
-        console.error("[API] Error creating optimization job:", error);
+        console.error("[API] Error creating optimization job:", {
+          message: error.message,
+          name: error.name,
+          isRateLimit: error instanceof OpenRouterRateLimitError,
+        });
 
         if (error instanceof OpenRouterRateLimitError) {
           return new Response(
