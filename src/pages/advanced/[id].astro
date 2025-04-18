@@ -1,0 +1,16 @@
+import AdvancedOptimizationComponent from "@/components/AdvancedOptimizationComponent";
+import Layout from "@/layouts/Layout.astro";
+
+// Get the job ID from the URL params
+const { id } = Astro.params;
+
+// If no ID provided, redirect to home
+if (!id) {
+  return Astro.redirect("/");
+}
+
+<Layout title="Advanced Image Optimization">
+  <main class="container mx-auto px-4 py-8">
+    <AdvancedOptimizationComponent client:load jobId={id} />
+  </main>
+</Layout>

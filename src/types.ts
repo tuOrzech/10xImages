@@ -99,3 +99,66 @@ export interface AuthResponse {
   user: User | null;
   error?: string;
 }
+
+// Types for advanced image optimization
+export interface OptimizationSettingsType {
+  format: string;
+  quality: number;
+  dimensions: DimensionsType;
+  compressionOptions: CompressionOptionsType;
+  metadataOptions: MetadataOptionsType;
+}
+
+export interface DimensionsType {
+  width: number | null;
+  height: number | null;
+  maintainAspectRatio: boolean;
+}
+
+export interface CompressionOptionsType {
+  method: string;
+  level: number;
+  formatSpecificOptions: Record<string, unknown>;
+}
+
+export interface MetadataOptionsType {
+  keepExif: boolean;
+  keepIptc: boolean;
+  keepXmp: boolean;
+  keepColorProfile: boolean;
+  addCopyright: boolean;
+  copyrightText: string;
+}
+
+export interface SharpPreserveMetadataOptions {
+  exif?: Record<string, unknown> | object;
+  icc?: boolean;
+  iptc?: boolean;
+  xmp?: boolean;
+}
+
+export interface ImageMetadataType {
+  width: number;
+  height: number;
+  format: string;
+  size: number;
+  hasExif: boolean;
+  hasIptc: boolean;
+  hasXmp: boolean;
+  hasColorProfile: boolean;
+}
+
+export interface AdvancedOptimizationViewModel {
+  job: OptimizationJobDTO | null;
+  settings: OptimizationSettingsType;
+  defaultSettings: OptimizationSettingsType;
+  originalImageUrl: string | null;
+  optimizedImageUrl: string | null;
+  originalMetadata: ImageMetadataType | null;
+  optimizedMetadata: ImageMetadataType | null;
+  isLoading: boolean;
+  isProcessing: boolean;
+  isSaving: boolean;
+  isBeforeAfterActive: boolean;
+  error: string | null;
+}
